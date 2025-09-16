@@ -165,7 +165,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get('/api/latest-data', (req, res) => {
-  const { limit = 500, offset = 0 } = req.query;
+  const { limit = 2000, offset = 0 } = req.query; // Límite más alto por defecto
   const limitNum = parseInt(limit);
   const offsetNum = parseInt(offset);
   
@@ -174,43 +174,63 @@ app.get('/api/latest-data', (req, res) => {
       return res.json([]);
     }
     
-    // Leer archivo línea por línea de manera eficiente
+    // Leer archivo de manera más eficiente
     const content = fs.readFileSync(CACHE_FILE, 'utf8');
     const lines = content.trim().split('\n').filter(line => line.trim());
     
-    console.log(`Total líneas en archivo: ${lines.length}, solicitando desde ${offsetNum} con límite ${limitNum}`);
-    
-    // Aplicar paginación
+    // Aplicar paginación rápida
     const startIndex = offsetNum;
     const endIndex = startIndex + limitNum;
     const requestedLines = lines.slice(startIndex, endIndex);
     
-    console.log(`Devolviendo líneas ${startIndex} a ${endIndex-1} (${requestedLines.length} registros)`);
-    
-    const records = requestedLines.map(line => {
+    // Parsear en lote más eficiente
+    const records = [];
+    for (let i = 0; i < requestedLines.length; i++) {
       try {
-        return JSON.parse(line);
+        records.push(JSON.parse(requestedLines[i]));
       } catch (error) {
-        console.error('Error parseando línea:', error);
-        return null;
+        // Ignorar líneas corruptas silenciosamente
+        continue;
       }
-    }).filter(Boolean);
+    }
     
+    // Headers para caché y compresión
+    res.setHeader('Cache-Control', 'public, max-age=60'); // Cache 1 minuto
+    res.setHeader('Content-Type', 'application/json');
     res.json(records);
     
   } catch (error) {
     console.error('Error en /api/latest-data:', error);
-    res.json([]);
+    res.status(500).json([]);
   }
 });
 
 app.get('/api/last-record', (req, res) => {
   try {
-    const lines = fs.readFileSync(CACHE_FILE, 'utf8').trim().split('\n');
+    const lines = fs.readFileSync(CACHE_FILE, 'utf8').trim().split('\n').filter(line => line.trim());
     const lastRecord = JSON.parse(lines[lines.length - 1]);
     res.json(lastRecord);
   } catch (error) {
     res.json(null);
+  }
+});
+
+app.get('/api/data-info', (req, res) => {
+  try {
+    const lines = fs.readFileSync(CACHE_FILE, 'utf8').trim().split('\n').filter(line => line.trim());
+    const records = lines.map(line => JSON.parse(line));
+    
+    const dates = records.map(r => new Date(r.fechaa)).sort((a, b) => a - b);
+    const info = {
+      total: records.length,
+      firstDate: dates[0]?.toISOString(),
+      lastDate: dates[dates.length - 1]?.toISOString(),
+      lastRecord: records[records.length - 1]
+    };
+    
+    res.json(info);
+  } catch (error) {
+    res.json({ error: error.message });
   }
 });
 
