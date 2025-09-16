@@ -165,35 +165,41 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get('/api/latest-data', (req, res) => {
-  const { limit = 100, offset = 0 } = req.query;
+  const { limit = 500, offset = 0 } = req.query;
+  const limitNum = parseInt(limit);
+  const offsetNum = parseInt(offset);
+  
   try {
-    const stats = fs.statSync(CACHE_FILE);
-    const size = stats.size;
-    const chunkSize = 100000; // 100KB por chunk
-    const chunks = Math.ceil(size / chunkSize);
-    const requestedChunk = Math.floor(offset / 1000);
-    
-    if (requestedChunk >= chunks) {
+    if (!fs.existsSync(CACHE_FILE)) {
       return res.json([]);
     }
     
-    const fd = fs.openSync(CACHE_FILE, 'r');
-    const buffer = Buffer.alloc(chunkSize);
-    const position = requestedChunk * chunkSize;
-    const bytesRead = fs.readSync(fd, buffer, 0, chunkSize, position);
-    fs.closeSync(fd);
+    // Leer archivo línea por línea de manera eficiente
+    const content = fs.readFileSync(CACHE_FILE, 'utf8');
+    const lines = content.trim().split('\n').filter(line => line.trim());
     
-    const lines = buffer.slice(0, bytesRead).toString().split('\n').filter(line => line.trim());
-    const records = lines.slice(offset % 1000, (offset % 1000) + parseInt(limit)).map(line => {
+    console.log(`Total líneas en archivo: ${lines.length}, solicitando desde ${offsetNum} con límite ${limitNum}`);
+    
+    // Aplicar paginación
+    const startIndex = offsetNum;
+    const endIndex = startIndex + limitNum;
+    const requestedLines = lines.slice(startIndex, endIndex);
+    
+    console.log(`Devolviendo líneas ${startIndex} a ${endIndex-1} (${requestedLines.length} registros)`);
+    
+    const records = requestedLines.map(line => {
       try {
         return JSON.parse(line);
-      } catch {
+      } catch (error) {
+        console.error('Error parseando línea:', error);
         return null;
       }
     }).filter(Boolean);
     
     res.json(records);
+    
   } catch (error) {
+    console.error('Error en /api/latest-data:', error);
     res.json([]);
   }
 });
