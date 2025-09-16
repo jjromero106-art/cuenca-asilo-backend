@@ -298,6 +298,63 @@ app.get('/api/day-data', (req, res) => {
   }
 });
 
+app.get('/api/week-data', (req, res) => {
+  const { startDate, endDate } = req.query; // Formato: YYYY-MM-DD
+  
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'Fechas de inicio y fin requeridas' });
+  }
+  
+  try {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    
+    const content = fs.readFileSync(CACHE_FILE, 'utf8');
+    const lines = content.trim().split('\n').filter(line => line.trim());
+    
+    const weekData = [];
+    
+    // Generar array de fechas de la semana para filtro rápido
+    const weekDates = [];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      weekDates.push(d.toISOString().split('T')[0]);
+    }
+    
+    // Filtrar líneas que contengan cualquier fecha de la semana
+    const filteredLines = lines.filter(line => 
+      weekDates.some(dateStr => line.includes(dateStr))
+    );
+    
+    filteredLines.forEach(line => {
+      try {
+        const record = JSON.parse(line);
+        const recordDate = new Date(record.fechaa);
+        
+        if (recordDate >= start && recordDate <= end) {
+          weekData.push({
+            id: record.id,
+            sensor1: record.sensor1,
+            fechaa: record.fechaa
+          });
+        }
+      } catch (error) {
+        // Ignorar líneas corruptas
+      }
+    });
+    
+    // Ordenar por fecha
+    weekData.sort((a, b) => new Date(a.fechaa) - new Date(b.fechaa));
+    
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.json(weekData);
+    
+  } catch (error) {
+    console.error('Error en /api/week-data:', error.message);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 // --- Ejecución ---
 (async () => {
   // Optimizado para 512MB - cargar solo lo necesario
