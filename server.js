@@ -355,6 +355,61 @@ app.get('/api/week-data', (req, res) => {
   }
 });
 
+app.get('/api/month-data', (req, res) => {
+  const { year, month } = req.query; // Formato: year=2024, month=01
+  
+  if (!year || !month) {
+    return res.status(400).json({ error: 'Año y mes requeridos' });
+  }
+  
+  try {
+    const content = fs.readFileSync(CACHE_FILE, 'utf8');
+    const lines = content.trim().split('\n').filter(line => line.trim());
+    
+    const monthData = [];
+    
+    // Filtro rápido por string de fecha YYYY-MM
+    const monthStr = `${year}-${month}`;
+    const filteredLines = lines.filter(line => line.includes(monthStr));
+    
+    // Procesar con resolución reducida (cada 3 registros para meses)
+    let skipCounter = 0;
+    const skipFactor = 3;
+    
+    filteredLines.forEach(line => {
+      try {
+        const record = JSON.parse(line);
+        const recordDate = new Date(record.fechaa);
+        
+        // Verificar que sea del mes correcto
+        if (recordDate.getFullYear() == year && (recordDate.getMonth() + 1) == parseInt(month)) {
+          // Aplicar resolución reducida
+          if (skipCounter % skipFactor === 0) {
+            monthData.push({
+              id: record.id,
+              sensor1: record.sensor1,
+              fechaa: record.fechaa
+            });
+          }
+          skipCounter++;
+        }
+      } catch (error) {
+        // Ignorar líneas corruptas
+      }
+    });
+    
+    // Ordenar por fecha
+    monthData.sort((a, b) => new Date(a.fechaa) - new Date(b.fechaa));
+    
+    res.setHeader('Cache-Control', 'public, max-age=600'); // Cache 10 minutos
+    res.json(monthData);
+    
+  } catch (error) {
+    console.error('Error en /api/month-data:', error.message);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 // --- Ejecución ---
 (async () => {
   // Optimizado para 512MB - cargar solo lo necesario
