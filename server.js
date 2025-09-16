@@ -10,19 +10,16 @@ app.use(express.static('.'));
                     // archivos o directorios directamente desde tu computadora
                     //  o servidor. Es como la “puerta” que le permite a tu programa 
                     // Node.js interactuar con el disco duro.
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 import {
-  getDatabase, // se usa para obtener una referencia a tu base de datos en tiempo real
-  ref, // se usa para crear una referencia a una ubicación específica dentro de la base de datos.
-  query, // filtrar, ordenar o limitar los resultados.
-  orderByKey, // Esto devuelve los datos ordenados por clave
-  startAfter, //Sirve para empezar a traer los resultados después de una clave o valor específico. 
-  limitToFirst,// Sirve para limitar la cantidad de resultados que devuelve la consulta, 
-                // empezando desde el primero (según el orden que hayas definido 
-                // con orderByKey(), orderByChild(), etc.).
-  get, // En Firebase, get() se usa para ejecutar una consulta una sola vez y 
-        // obtener los datos en ese momento.
-  onChildAdded // Se activa cada vez que se agrega un nuevo hijo (nodo) en una referencia o consulta
+  getDatabase,
+  ref,
+  query,
+  orderByKey,
+  startAfter,
+  limitToFirst,
+  get,
+  onChildAdded
 } from "firebase/database";
 
 // --- Configuración de Firebase ---
@@ -37,8 +34,15 @@ const firebaseConfig = {
   measurementId: "G-SBS6NWMWMT"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+// Inicializar Firebase solo si no está ya inicializado
+let firebaseApp;
+if (getApps().length === 0) {
+  firebaseApp = initializeApp(firebaseConfig);
+} else {
+  firebaseApp = getApps()[0];
+}
+
+const db = getDatabase(firebaseApp);
 
 // --- Archivos ---
 const CACHE_FILE = "firebase-cache.jsonl";
