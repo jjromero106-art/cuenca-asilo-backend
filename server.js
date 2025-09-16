@@ -248,6 +248,56 @@ app.get('/api/data-info', (req, res) => {
   }
 });
 
+app.get('/api/day-data', (req, res) => {
+  const { date } = req.query; // Formato: YYYY-MM-DD
+  
+  if (!date) {
+    return res.status(400).json({ error: 'Fecha requerida' });
+  }
+  
+  try {
+    const targetDate = new Date(date);
+    const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+    const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+    
+    const content = fs.readFileSync(CACHE_FILE, 'utf8');
+    const lines = content.trim().split('\n').filter(line => line.trim());
+    
+    const dayData = [];
+    
+    // Búsqueda rápida - solo parsear líneas que contengan la fecha
+    const dateStr = date; // YYYY-MM-DD
+    const filteredLines = lines.filter(line => line.includes(dateStr));
+    
+    filteredLines.forEach(line => {
+      try {
+        const record = JSON.parse(line);
+        const recordDate = new Date(record.fechaa);
+        
+        if (recordDate >= startOfDay && recordDate <= endOfDay) {
+          dayData.push({
+            id: record.id,
+            sensor1: record.sensor1,
+            fechaa: record.fechaa
+          });
+        }
+      } catch (error) {
+        // Ignorar líneas corruptas
+      }
+    });
+    
+    // Ordenar por fecha
+    dayData.sort((a, b) => new Date(a.fechaa) - new Date(b.fechaa));
+    
+    res.setHeader('Cache-Control', 'public, max-age=300'); // Cache 5 minutos
+    res.json(dayData);
+    
+  } catch (error) {
+    console.error('Error en /api/day-data:', error.message);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 // --- Ejecución ---
 (async () => {
   // Optimizado para 512MB - cargar solo lo necesario
