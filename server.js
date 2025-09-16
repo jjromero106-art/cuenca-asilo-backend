@@ -27,10 +27,10 @@ import {
 
 // --- Configuración de Firebase ---
 const firebaseConfig = {
-  apiKey: "AIzaSyAYA7zjtvLo6jcCoXgi8-PULcvXdudG_NM",
-  authDomain: "acueductof-a2d8f.firebaseapp.com",
-  databaseURL: "https://acueductof-a2d8f-default-rtdb.firebaseio.com",
-  projectId: "acueductof-a2d8f",
+  apiKey: process.env.FIREBASE_API_KEY || "AIzaSyAYA7zjtvLo6jcCoXgi8-PULcvXdudG_NM",
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || "acueductof-a2d8f.firebaseapp.com",
+  databaseURL: process.env.FIREBASE_DATABASE_URL || "https://acueductof-a2d8f-default-rtdb.firebaseio.com",
+  projectId: process.env.FIREBASE_PROJECT_ID || "acueductof-a2d8f",
   storageBucket: "acueductof-a2d8f.appspot.com",
   messagingSenderId: "428972606386",
   appId: "1:428972606386:web:6568718194bd76b4885aab",
@@ -152,6 +152,10 @@ function listenForNew(path) {
 }
 
 // --- API Endpoints ---
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
 app.get('/api/latest-data', (req, res) => {
   try {
     const lines = fs.readFileSync(CACHE_FILE, 'utf8').trim().split('\n');
