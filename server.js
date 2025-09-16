@@ -410,6 +410,61 @@ app.get('/api/month-data', (req, res) => {
   }
 });
 
+app.get('/api/year-data', (req, res) => {
+  const { year } = req.query; // Formato: year=2024
+  
+  if (!year) {
+    return res.status(400).json({ error: 'Año requerido' });
+  }
+  
+  try {
+    const content = fs.readFileSync(CACHE_FILE, 'utf8');
+    const lines = content.trim().split('\n').filter(line => line.trim());
+    
+    const yearData = [];
+    
+    // Filtro rápido por string de año
+    const yearStr = `${year}-`;
+    const filteredLines = lines.filter(line => line.includes(yearStr));
+    
+    // Procesar con resolución muy reducida (cada 36 registros para años)
+    let skipCounter = 0;
+    const skipFactor = 36;
+    
+    filteredLines.forEach(line => {
+      try {
+        const record = JSON.parse(line);
+        const recordDate = new Date(record.fechaa);
+        
+        // Verificar que sea del año correcto
+        if (recordDate.getFullYear() == year) {
+          // Aplicar resolución muy reducida
+          if (skipCounter % skipFactor === 0) {
+            yearData.push({
+              id: record.id,
+              sensor1: record.sensor1,
+              fechaa: record.fechaa
+            });
+          }
+          skipCounter++;
+        }
+      } catch (error) {
+        // Ignorar líneas corruptas
+      }
+    });
+    
+    // Ordenar por fecha
+    yearData.sort((a, b) => new Date(a.fechaa) - new Date(b.fechaa));
+    
+    res.setHeader('Cache-Control', 'public, max-age=1200'); // Cache 20 minutos
+    res.json(yearData);
+    
+  } catch (error) {
+    console.error('Error en /api/year-data:', error.message);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 // --- Ejecución ---
 (async () => {
   // Optimizado para 512MB - cargar solo lo necesario
