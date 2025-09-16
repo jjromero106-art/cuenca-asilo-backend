@@ -250,12 +250,12 @@ app.get('/api/data-info', (req, res) => {
 
 // --- Ejecución ---
 (async () => {
-  // Sin restricciones - cargar ABSOLUTAMENTE todos los datos
-  loadRecentIDs(50000);
+  // Optimizado para 512MB - cargar solo lo necesario
+  loadRecentIDs(2000);
   const PATH = "payload";
   
   try {
-    await downloadInBatches(PATH, 2000); // Lotes grandes para más velocidad
+    await downloadInBatches(PATH, 300); // Lotes pequeños para 512MB
     console.log('✅ Descarga inicial completada');
   } catch (error) {
     console.error('❌ Error en descarga inicial:', error);
@@ -268,11 +268,18 @@ app.get('/api/data-info', (req, res) => {
     console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
   });
   
-  // Limpiar memoria cada 30 minutos
+  // Limpiar memoria cada 5 minutos para 512MB
   setInterval(() => {
     if (global.gc) {
       global.gc();
       console.log('🧹 Memoria limpiada');
     }
-  }, 30 * 60 * 1000);
+    // Limpiar Set si crece mucho
+    if (processedIDs.size > 5000) {
+      const idsArray = Array.from(processedIDs);
+      processedIDs.clear();
+      idsArray.slice(-2000).forEach(id => processedIDs.add(id));
+      console.log('🧹 IDs optimizados');
+    }
+  }, 5 * 60 * 1000);
 })();
