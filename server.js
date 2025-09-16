@@ -64,8 +64,8 @@ function loadLastKey() {
   }
 }
 
-// --- Leer solo los últimos N registros del cache para evitar duplicados ---
-function loadRecentIDs(linesToRead = 1000) {
+// --- Leer TODOS los registros del cache para evitar duplicados ---
+function loadRecentIDs(linesToRead = 50000) {
   try {
     if (!fs.existsSync(CACHE_FILE)) return;
     const stats = fs.statSync(CACHE_FILE); //Obtiene la información del archivo (tamaño, fecha de creación, etc.).
@@ -102,10 +102,9 @@ async function downloadInBatches(path, batchSize = 1000) {
   let lastKey = loadLastKey();
   let finished = false;
   let totalDownloaded = 0;
-  const MAX_RECORDS = 1000; // Máximo 1000 registros totales
-  console.log("⏳ Descargando datos iniciales...");
+  console.log("⏳ Descargando TODOS los datos iniciales...");
 
-  while (!finished && totalDownloaded < MAX_RECORDS) {
+  while (!finished) {
     const q = lastKey
       ? query(ref(db, path), orderByKey(), startAfter(lastKey), limitToFirst(batchSize)) // para continuar la consulta después de la última clave que leíste.
       : query(ref(db, path), orderByKey(), limitToFirst(batchSize)); // Simplemente empieza desde el principio.
@@ -127,7 +126,6 @@ async function downloadInBatches(path, batchSize = 1000) {
         appendRecord({ id: key, sensor1: item.sensor1, fechaa: item.fechaa });
         lastKey = key;
         totalDownloaded++;
-        if (totalDownloaded >= MAX_RECORDS) break;
       }
     }
 
@@ -236,12 +234,12 @@ app.get('/api/data-info', (req, res) => {
 
 // --- Ejecución ---
 (async () => {
-  // Cargar con límites muy bajos
-  loadRecentIDs(50);
+  // Sin restricciones - cargar ABSOLUTAMENTE todos los datos
+  loadRecentIDs(50000);
   const PATH = "payload";
   
   try {
-    await downloadInBatches(PATH, 50); // Solo 50 registros por lote
+    await downloadInBatches(PATH, 2000); // Lotes grandes para más velocidad
     console.log('✅ Descarga inicial completada');
   } catch (error) {
     console.error('❌ Error en descarga inicial:', error);
