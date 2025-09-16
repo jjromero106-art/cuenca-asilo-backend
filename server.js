@@ -216,10 +216,17 @@ app.get('/api/last-record', (req, res) => {
 
 // --- Ejecución ---
 (async () => {
-  // Solo cargar IDs recientes, sin descarga masiva inicial
-  loadRecentIDs(100);
+  // Cargar con límites muy bajos
+  loadRecentIDs(50);
   const PATH = "payload";
-  // await downloadInBatches(PATH, 200); // Comentado para evitar sobrecarga
+  
+  try {
+    await downloadInBatches(PATH, 50); // Solo 50 registros por lote
+    console.log('✅ Descarga inicial completada');
+  } catch (error) {
+    console.error('❌ Error en descarga inicial:', error);
+  }
+  
   listenForNew(PATH);
   
   const PORT = process.env.PORT || 3000;
