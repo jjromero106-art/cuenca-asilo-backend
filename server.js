@@ -65,7 +65,7 @@ function loadLastKey() {
 }
 
 // --- Leer solo los últimos N registros del cache para evitar duplicados ---
-function loadRecentIDs(linesToRead = 10000) {
+function loadRecentIDs(linesToRead = 1000) {
   try {
     if (!fs.existsSync(CACHE_FILE)) return;
     const stats = fs.statSync(CACHE_FILE); //Obtiene la información del archivo (tamaño, fecha de creación, etc.).
@@ -101,9 +101,11 @@ function appendRecord(record) {
 async function downloadInBatches(path, batchSize = 1000) {
   let lastKey = loadLastKey();
   let finished = false;
+  let totalDownloaded = 0;
+  const MAX_RECORDS = 1000; // Máximo 1000 registros totales
   console.log("⏳ Descargando datos iniciales...");
 
-  while (!finished) {
+  while (!finished && totalDownloaded < MAX_RECORDS) {
     const q = lastKey
       ? query(ref(db, path), orderByKey(), startAfter(lastKey), limitToFirst(batchSize)) // para continuar la consulta después de la última clave que leíste.
       : query(ref(db, path), orderByKey(), limitToFirst(batchSize)); // Simplemente empieza desde el principio.
@@ -124,6 +126,8 @@ async function downloadInBatches(path, batchSize = 1000) {
       if (item && item.sensor1 !== undefined && item.fechaa) {
         appendRecord({ id: key, sensor1: item.sensor1, fechaa: item.fechaa });
         lastKey = key;
+        totalDownloaded++;
+        if (totalDownloaded >= MAX_RECORDS) break;
       }
     }
 
@@ -161,10 +165,34 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get('/api/latest-data', (req, res) => {
+  const { limit = 100, offset = 0 } = req.query;
   try {
-    const lines = fs.readFileSync(CACHE_FILE, 'utf8').trim().split('\n');
-    const latestRecords = lines.slice(-100).map(line => JSON.parse(line));
-    res.json(latestRecords);
+    const stats = fs.statSync(CACHE_FILE);
+    const size = stats.size;
+    const chunkSize = 100000; // 100KB por chunk
+    const chunks = Math.ceil(size / chunkSize);
+    const requestedChunk = Math.floor(offset / 1000);
+    
+    if (requestedChunk >= chunks) {
+      return res.json([]);
+    }
+    
+    const fd = fs.openSync(CACHE_FILE, 'r');
+    const buffer = Buffer.alloc(chunkSize);
+    const position = requestedChunk * chunkSize;
+    const bytesRead = fs.readSync(fd, buffer, 0, chunkSize, position);
+    fs.closeSync(fd);
+    
+    const lines = buffer.slice(0, bytesRead).toString().split('\n').filter(line => line.trim());
+    const records = lines.slice(offset % 1000, (offset % 1000) + parseInt(limit)).map(line => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return null;
+      }
+    }).filter(Boolean);
+    
+    res.json(records);
   } catch (error) {
     res.json([]);
   }
@@ -182,13 +210,21 @@ app.get('/api/last-record', (req, res) => {
 
 // --- Ejecución ---
 (async () => {
-  loadRecentIDs(10000);
+  loadRecentIDs(500);
   const PATH = "payload";
-  await downloadInBatches(PATH, 1000);
+  await downloadInBatches(PATH, 200);
   listenForNew(PATH);
   
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
     console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
   });
+  
+  // Limpiar memoria cada 30 minutos
+  setInterval(() => {
+    if (global.gc) {
+      global.gc();
+      console.log('🧹 Memoria limpiada');
+    }
+  }, 30 * 60 * 1000);
 })();
