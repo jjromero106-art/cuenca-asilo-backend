@@ -210,9 +210,10 @@ app.get('/api/last-record', (req, res) => {
 
 // --- Ejecución ---
 (async () => {
-  loadRecentIDs(500);
+  // Solo cargar IDs recientes, sin descarga masiva inicial
+  loadRecentIDs(100);
   const PATH = "payload";
-  await downloadInBatches(PATH, 200);
+  // await downloadInBatches(PATH, 200); // Comentado para evitar sobrecarga
   listenForNew(PATH);
   
   const PORT = process.env.PORT || 3000;
