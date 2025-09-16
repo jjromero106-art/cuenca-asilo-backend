@@ -80,8 +80,15 @@ function loadRecentIDs(linesToRead = 50000) {
     const lines = buffer.toString().split("\n").slice(-linesToRead); //Con .toString() lo conviertes a texto legible (string).
     lines.forEach(line => {
       if (!line.trim()) return;
-      const obj = JSON.parse(line);
-      processedIDs.add(obj.id);
+      try {
+        const obj = JSON.parse(line);
+        if (obj && obj.id) {
+          processedIDs.add(obj.id);
+        }
+      } catch (error) {
+        // Ignorar líneas corruptas silenciosamente
+        console.warn(`Línea corrupta ignorada: ${line.substring(0, 50)}...`);
+      }
     });
 
     console.log(`📂 Cargados ${processedIDs.size} IDs recientes del cache`);
@@ -92,9 +99,18 @@ function loadRecentIDs(linesToRead = 50000) {
 
 // --- Guardar registro en JSONL si no está duplicado ---
 function appendRecord(record) {
-  if (processedIDs.has(record.id)) return;
-  fs.appendFileSync(CACHE_FILE, JSON.stringify(record) + "\n", "utf8");
-  processedIDs.add(record.id);
+  if (!record || !record.id || processedIDs.has(record.id)) return;
+  
+  try {
+    // Validar que el record sea válido antes de guardar
+    if (record.sensor1 !== undefined && record.fechaa) {
+      const jsonLine = JSON.stringify(record) + "\n";
+      fs.appendFileSync(CACHE_FILE, jsonLine, "utf8");
+      processedIDs.add(record.id);
+    }
+  } catch (error) {
+    console.error('Error guardando registro:', error, record);
+  }
 }
 
 // --- Descarga inicial por bloques desde lastKey ---
