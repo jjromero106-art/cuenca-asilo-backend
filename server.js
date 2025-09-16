@@ -3,7 +3,19 @@ import express from "express";
 import cors from "cors";
 
 const app = express();
-app.use(cors());
+
+// Configurar CORS para permitir el frontend
+app.use(cors({
+  origin: [
+    'https://cuenca-asilo-frontend.onrender.com',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.static('.'));
 
 // Sirve para leer, escribir, modificar y manejar 
